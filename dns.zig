@@ -28,12 +28,12 @@ pub const DnsServer = struct {
 
     pub fn start(self: DnsServer) !void {
         const address = try std.net.Address.parseIp(self.ip_addr, self.port);
-        const tpe: u32 = posix.SOCK.STREAM;
-        const protocol = posix.IPPROTO.TCP;
+        const tpe: u32 = posix.SOCK.DGRAM;
+        const protocol = posix.IPPROTO.UDP;
         const listener = try posix.socket(address.any.family, tpe, protocol);
         defer posix.close(listener);
 
-        try posix.setsockopt(listener, posix.SOL.SOCKET, posix.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
+        //try posix.setsockopt(listener, posix.SOL.SOCKET, posix.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
         try posix.bind(listener, &address.any, address.getOsSockLen());
         try posix.listen(listener, 128);
 
