@@ -7,13 +7,15 @@
 // https://github.com/EmilHernvall/dnsguide
 // https://github.com/google/gopacket/blob/master/layers/dns.go
 
+// echo 'hello udp server' | nc -uv 127.0.0.1 32100
+
 const std = @import("std");
 const net = std.net;
 const posix = std.posix;
 const print = std.debug.print;
 
 pub fn main() !void {
-    const server = DnsServer.init("127.0.0.1", 8443);
+    const server = DnsServer.init("127.0.0.1", 32100);
     try server.start();
     print("dns server is ready\n", .{});
 }
@@ -30,35 +32,34 @@ pub const DnsServer = struct {
         const address = try std.net.Address.parseIp(self.ip_addr, self.port);
         const tpe: u32 = posix.SOCK.DGRAM;
         const protocol = posix.IPPROTO.UDP;
-        const listener = try posix.socket(address.any.family, tpe, protocol);
-        defer posix.close(listener);
+        const socket = try posix.socket(address.any.family, tpe, protocol);
+        defer posix.close(socket);
 
-        //try posix.setsockopt(listener, posix.SOL.SOCKET, posix.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
-        try posix.bind(listener, &address.any, address.getOsSockLen());
-        try posix.listen(listener, 128);
+        try posix.bind(socket, &address.any, address.getOsSockLen());
+
+        var buf: [1024]u8 = undefined;
 
         while (true) {
             var client_address: net.Address = undefined;
             var client_address_len: posix.socklen_t = @sizeOf(net.Address);
 
-            const socket = posix.accept(listener, &client_address.any, &client_address_len, 0) catch |err| {
+            const n_recv = posix.recvfrom(socket, buf[0..], 0, &client_address.any, &client_address_len) catch |err| {
                 print("error accepting connection: {}\n", .{err});
                 continue;
             };
-            defer posix.close(socket);
 
-            print("{f} connected\n", .{client_address});
+            print("{f} connected, recieved {d} byte(s), {s}\n", .{ client_address, n_recv, buf[0..n_recv] });
 
-            write(socket, "hello and goodbye(i am sending a new line)\n") catch |err| {
+            write(socket, "hello and goodbye(i am sending a new line)\n", client_address, client_address_len) catch |err| {
                 print("error writing: {}\n", .{err});
             };
         }
     }
 
-    fn write(socket: posix.socket_t, msg: []const u8) !void {
+    fn write(socket: posix.socket_t, msg: []const u8, client_address: net.Address, client_address_len: posix.socklen_t) !void {
         var pos: usize = 0;
         while (pos < msg.len) {
-            const written = try posix.write(socket, msg[pos..]);
+            const written = try posix.sendto(socket, msg[pos..], 0, &client_address.any, client_address_len);
             if (written == 0) {
                 return error.closed;
             }
