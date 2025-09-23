@@ -35,9 +35,15 @@ pub const DnsServer = struct {
         const socket = try posix.socket(address.any.family, tpe, protocol);
         defer posix.close(socket);
 
+        print("server started on: {s}:{d}\n", .{ self.ip_addr, self.port });
+
         try posix.bind(socket, &address.any, address.getOsSockLen());
 
         var buf: [1024]u8 = undefined;
+        var result: [1024]u8 = undefined;
+        const greet: []const u8 = "(dns server): ";
+
+        @memcpy(result[0..greet.len], greet);
 
         while (true) {
             var client_address: net.Address = undefined;
@@ -49,8 +55,9 @@ pub const DnsServer = struct {
             };
 
             print("{f} connected, recieved {d} byte(s), {s}\n", .{ client_address, n_recv, buf[0..n_recv] });
+            @memcpy(result[greet.len..(greet.len + n_recv)], buf[0..n_recv]);
 
-            write(socket, "hello and goodbye(i am sending a new line)\n", client_address, client_address_len) catch |err| {
+            write(socket, result[0..(greet.len + n_recv)], client_address, client_address_len) catch |err| {
                 print("error writing: {}\n", .{err});
             };
         }
