@@ -20,15 +20,46 @@ pub fn main() !void {
     print("dns server is ready\n", .{});
 }
 
-pub const DnsServer = struct {
+const BytePacketBuffer = struct {
+    buf: [512]u8,
+    pos: usize,
+
+    fn init(content: [512]u8) BytePacketBuffer {
+        return BytePacketBuffer{ .buf = content, .pos = 0 };
+    }
+
+    fn position(self: BytePacketBuffer) usize {
+        return self.pos;
+    }
+
+    fn step(self: BytePacketBuffer, steps: usize) void {
+        self.pos += steps;
+    }
+
+    fn seek(self: BytePacketBuffer, new_pos: usize) void {
+        self.pos = new_pos;
+    }
+
+    fn read(self: BytePacketBuffer) !u8 {
+        if (self.pos >= 512) {
+            return error.EndOfBuffer;
+        }
+
+        const res = self.buf[self.pos];
+        self.pos += 1;
+        return res;
+    }
+};
+
+const DnsServer = struct {
     ip_addr: []const u8,
     port: u16,
 
-    pub fn init(ip_addr: []const u8, port: u16) DnsServer {
+    fn init(ip_addr: []const u8, port: u16) DnsServer {
         return DnsServer{ .ip_addr = ip_addr, .port = port };
     }
 
-    pub fn start(self: DnsServer) !void {
+    fn start(self: DnsServer) !void {
         const address = try std.net.Address.parseIp(self.ip_addr, self.port);
         const tpe: u32 = posix.SOCK.DGRAM;
         const protocol = posix.IPPROTO.UDP;
